@@ -1,6 +1,8 @@
 # 2D Drone simulator with cargo
 
-![Image](image/screenshot_flying.png)
+<img src="images/screenshot_flying.png" width="400">
+
+<!--![Image](images/screenshot_flying.png)-->
 
 ## Overview
 A 2D Drone Simulator with cargo on a rope. A controller stabilizes the drone and the drone and actively stops the cargo from swinging. Written in C++ with SDL2 for visualization.
