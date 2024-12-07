@@ -1,6 +1,6 @@
 # 2D Drone simulator with cargo
 
-<img src="images/screenshot_flying.png" width="600">
+<img src="resources/screenshot_flying.png" width="600">
 
 <!--![Image](resources/screenshot_flying.png)-->
 
