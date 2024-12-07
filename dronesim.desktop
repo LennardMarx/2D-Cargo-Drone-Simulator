@@ -1,6 +1,0 @@
-[Desktop Entry]
-Name=Drone Simulator
-Type=Application
-Exec=/home/lennard/Projects/DroneSimulator/bin/dronesim
-Icon=/home/lennard/Projects/DroneSimulator/images/Drone_Icon.png
-Terminal=false

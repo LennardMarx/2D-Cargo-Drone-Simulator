@@ -29,8 +29,8 @@ UI::~UI() {
 void UI::clear() {
   setDrawColor(255, 255, 255, 255);
   SDL_RenderClear(renderer);
-  setDrawColor(0, 0, 0, 255);
-  // setDrawColor(249, 245, 215, 255); // gruv-light (lightest)
+  // setDrawColor(0, 0, 0, 255);
+  setDrawColor(249, 245, 215, 255); // gruv-light (lightest)
 }
 
 void UI::present() {
@@ -118,12 +118,20 @@ std::vector<unsigned char> UI::WhichKeysDown() {
     KeysDown.push_back('l');
   if (currentKeyStates[SDL_SCANCODE_RIGHT])
     KeysDown.push_back('r');
+  if (currentKeyStates[SDL_SCANCODE_W])
+    KeysDown.push_back('u');
+  if (currentKeyStates[SDL_SCANCODE_S])
+    KeysDown.push_back('d');
+  if (currentKeyStates[SDL_SCANCODE_A])
+    KeysDown.push_back('l');
+  if (currentKeyStates[SDL_SCANCODE_D])
+    KeysDown.push_back('r');
   if (currentKeyStates[SDL_SCANCODE_Q])
     KeysDown.push_back('Q');
   if (currentKeyStates[SDL_SCANCODE_R])
     KeysDown.push_back('R');
-  if (currentKeyStates[SDL_SCANCODE_D])
-    KeysDown.push_back('D');
+  // if (currentKeyStates[SDL_SCANCODE_D])
+  //   KeysDown.push_back('D');
   if (currentKeyStates[SDL_SCANCODE_C])
     KeysDown.push_back('C');
   if (currentKeyStates[SDL_SCANCODE_E])

@@ -15,10 +15,16 @@
 #include "../include/ResourceManager.hpp"
 #include "../include/TexturedRectangle.hpp"
 
+#include <SDL2/SDL_ttf.h>
+#include <cstdlib>
 #include <string>
 #include <unistd.h>
 #include <utility>
 #include <vector>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 // #include <SDL2/SDL_image.h>
 
@@ -41,12 +47,12 @@ void renderImages(SDL_Renderer *&_renderer, double _x_drone, double _y_drone,
                                       "../resources/integrationMethod.bmp");
   integrationMethod.Draw(0, 0, 1200,
                          800); // backdround for choice if integration method
-  TexturedRectangle background(_renderer, "../resources/background.bmp");
+  TexturedRectangle background(_renderer, "../resources/background_gruv.bmp");
   background.Draw(0, 0, 1200, 800); // game background
-  AnimatedSprite drone(_renderer, "../resources/drone_animated.bmp");
+  AnimatedSprite drone(_renderer, "../resources/drone_animated_gruv.bmp");
   drone.Draw(x, y, droneW,
              droneH); // animated bmp of the drone (propellors turning)
-  TexturedRectangle cargo(_renderer, "../resources/cargo.bmp");
+  TexturedRectangle cargo(_renderer, "../resources/cargo_gruv.bmp");
   cargo.Draw(x_c, y_c, cargoW, cargoH); // image of the cargo
 
   if (_choice1 == 0 && _choice2 == 0) {
@@ -75,9 +81,7 @@ void renderImages(SDL_Renderer *&_renderer, double _x_drone, double _y_drone,
   }
 }
 
-int main() {
-  chdir(SDL_GetBasePath());
-
+struct context {
   const int FPS = 80;                // set FPS
   const int frameDelay = 1000 / FPS; // delay according to FPS
   Uint32 frameStart;                 // keeps track of time (?)
@@ -96,14 +100,14 @@ int main() {
 
   char keyPress = 0;
 
-  bool choice1 = 0;
-  bool choice2 = 0;
-  bool choice3 = 0;
+  bool choice1 = 1;
+  bool choice2 = 1;
+  bool choice3 = 1;
   bool droneType = 1;
   bool integrationMethod = 1;
   bool reset = false;
   bool controllerActive = true;
-  static int controllerCheck = 0;
+  int controllerCheck;
 
   double thrust = 5 * 9.81;
   double angVel = 0;
@@ -114,187 +118,204 @@ int main() {
   bool quit = false;
 
   SDL_Event event;
+};
 
-  while (!quit) {
-    frameStart = SDL_GetTicks(); // limit framerate (see end of while loop)
+static void mainloop(void *arg) {
+  // chdir(SDL_GetBasePath());
+  context *ctx = static_cast<context *>(arg);
+  ctx->frameStart = SDL_GetTicks(); // limit framerate (see end of while loop)
 
-    while (SDL_PollEvent(&event) != 0) {
-      // stop when pressing "x" (?)
-      if (event.type == SDL_QUIT) {
-        quit = true;
-      }
-    }
-    auto keys_down = ui.WhichKeysDown(); // saves which key was pressed
-
-    keyPress = 0; // resetting the key press
-    for (unsigned char c : keys_down) {
-      keyPress = c;
-      if (keyPress == 'Q') {
-        quit = true;
-      } else if (keyPress == 'R') {
-        reset = true;
-      }
-      // else if (keyPress == 'X')
-      // {
-      // if (controllerCheck == 0)
-      // {
-      // controllerActive = !controllerActive;
-      // controllerCheck++;
-      // }
-      // }
-      else if (keyPress == 'X') {
-        controllerActive = false;
-      } else if (keyPress == 'Y') {
-        controllerActive = true;
-      } else if (choice1 == 1 &&
-                 choice2 == 1) // only start drone when choices were made
-      {
-        if (keyPress == 'u') {
-          if (controllerActive == true) {
-            yVel += 0.13;
-          } else {
-            thrust += 0.5;
-          }
-        } else if (keyPress == 'd') {
-          if (controllerActive == true) {
-            yVel -= 0.13;
-          } else {
-            thrust -= 0.5;
-          }
-        } else if (keyPress == 'l') {
-          if (controllerActive == true) {
-            xVel -= 0.15;
-          } else {
-            angVel += 0.1;
-          }
-        } else if (keyPress == 'r') {
-          if (controllerActive == true) {
-            xVel += 0.15;
-          } else {
-            angVel -= 0.1;
-          }
-        }
-      } else if (keyPress == 'D') {
-        if (choice1 == 0) {
-          droneType = 0;
-          choice1 = 1;
-        }
-      } else if (keyPress == 'C') {
-        if (choice1 == 0) {
-          droneType = 1;
-          choice1 = 1;
-        }
-      } else if (keyPress == 'E') {
-        if (choice2 == 0) {
-          integrationMethod = 0;
-          choice2 = 1;
-        }
-      } else if (keyPress == 'K') {
-        if (choice2 == 0) {
-          integrationMethod = 1;
-          choice2 = 1;
-        }
-      }
-    }
-    // pause the game
-    if (pause) {
-      // do nothing
-    } else {
-
-      // reset
-      if (reset == true) {
-        if (droneType == 1) {
-          thrust = 5 * 9.81;
-          cargoDrone.setStates({0, 0, 0, 0, 0, 0, 0 - 1, 0, 0});
-        } else if (droneType == 0) {
-          thrust = 3 * 9.81;
-          drone.setStates({0, 0, 0, 0, 0, 0, 0, 0, 0});
-        }
-        angVel = 0;
-        xVel = 0;
-        yVel = 0;
-        reset = false;
-        // set velocity inputs to Drone vel
-      }
-
-      // integration
-      for (int i = 0; i < 2; ++i) {
-        if (controllerActive == true) {
-          controller.setDroneType(droneType);
-          controller.setReceivedVelref({xVel, yVel});
-          controller.calculateControllerOutput();
-          if (droneType == 1) {
-            controller.setReceivedUpdatedStates(cargoDrone.getStates());
-            cargoDroneDynamics.setReceivedInputs(controller.getInput());
-          } else if (droneType == 0) {
-            controller.setReceivedUpdatedStates(drone.getStates());
-            droneDynamics.setReceivedInputs(controller.getInput());
-          }
-        } else {
-          if (droneType == 1) {
-            cargoDroneDynamics.setReceivedInputs({thrust, angVel});
-          } else if (droneType == 0) {
-            droneDynamics.setReceivedInputs({thrust, angVel});
-          }
-        }
-        if (droneType == 1) {
-          cargoDroneDynamics.setReceivedStates(cargoDrone.getStates());
-          if (integrationMethod == 1) {
-            cargoDroneDynamics.rungeKutta();
-          } else if (integrationMethod == 0) {
-            cargoDroneDynamics.forwardEuler();
-          }
-          cargoDrone.setStates(cargoDroneDynamics.getUpdatedStates());
-        } else if (droneType == 0) {
-          droneDynamics.setReceivedStates(drone.getStates());
-          if (integrationMethod == 1) {
-            droneDynamics.rungeKutta();
-          } else if (integrationMethod == 0) {
-            droneDynamics.forwardEuler();
-          }
-          drone.setStates(droneDynamics.getUpdatedStates());
-        }
-      }
-
-      // scaling coordinates to drone/cargo size
-      if (droneType == 1) {
-        x = lineLength * 2 * cargoDrone.getStates().at(0);
-        y = -lineLength * 2 * cargoDrone.getStates().at(1);
-        angle = cargoDrone.getStates().at(2);
-        x_c = lineLength * 2 * cargoDrone.getStates().at(5);
-        y_c = -lineLength * 2 * cargoDrone.getStates().at(6);
-      } else if (droneType == 0) {
-        x = lineLength * 2 * drone.getStates().at(0);
-        y = -lineLength * 2 * drone.getStates().at(1);
-        angle = drone.getStates().at(2);
-        x_c = lineLength * 2 * drone.getStates().at(5);
-        y_c = -lineLength * 2 * drone.getStates().at(6);
-      }
-    }
-    // rendering screen
-    ui.clear(); // clears screen
-
-    // function to render all the bmp and the animation
-    renderImages(ui.getRenderer(), x, y, angle, x_c, y_c, droneType, choice1,
-                 choice2);
-
-    // draw Rope if cargo drone was chosen
-    if (droneType == 1 && choice1 == 1 && choice2 == 1) {
-      ui.drawLine(x, y, x_c, y_c);
-    }
-
-    ui.present(); // shows rendered objects
-
-    // frame time to limit FPS
-    frameTime = SDL_GetTicks() - frameStart;
-    if (frameDelay > frameTime) {
-      SDL_Delay(frameDelay - frameTime);
-    }
-    controllerCheck++;        // increases frame number
-    if (controllerCheck > 15) // resets frameNumber if at end of animation
-    {
-      controllerCheck = 0;
+  while (SDL_PollEvent(&ctx->event) != 0) {
+    // stop when pressing "x" (?)
+    if (ctx->event.type == SDL_QUIT) {
+      ctx->quit = true;
     }
   }
+  auto keys_down = ctx->ui.WhichKeysDown(); // saves which key was pressed
+
+  ctx->keyPress = 0; // resetting the key press
+  for (unsigned char c : keys_down) {
+    ctx->keyPress = c;
+    if (ctx->keyPress == 'Q') {
+      ctx->quit = true;
+    } else if (ctx->keyPress == 'R') {
+      ctx->reset = true;
+    }
+    // else if (keyPress == 'X')
+    // {
+    // if (controllerCheck == 0)
+    // {
+    // controllerActive = !controllerActive;
+    // controllerCheck++;
+    // }
+    // }
+    else if (ctx->keyPress == 'X') {
+      ctx->controllerActive = false;
+    } else if (ctx->keyPress == 'Y') {
+      ctx->controllerActive = true;
+    } else if (ctx->choice1 == 1 &&
+               ctx->choice2 == 1) // only start drone when choices were made
+    {
+      if (ctx->keyPress == 'u') {
+        if (ctx->controllerActive == true) {
+          ctx->yVel += 0.13;
+        } else {
+          ctx->thrust += 0.5;
+        }
+      } else if (ctx->keyPress == 'd') {
+        if (ctx->controllerActive == true) {
+          ctx->yVel -= 0.13;
+        } else {
+          ctx->thrust -= 0.5;
+        }
+      } else if (ctx->keyPress == 'l') {
+        if (ctx->controllerActive == true) {
+          ctx->xVel -= 0.15;
+        } else {
+          ctx->angVel += 0.1;
+        }
+      } else if (ctx->keyPress == 'r') {
+        if (ctx->controllerActive == true) {
+          ctx->xVel += 0.15;
+        } else {
+          ctx->angVel -= 0.1;
+        }
+      }
+    } else if (ctx->keyPress == 'D') {
+      if (ctx->choice1 == 0) {
+        ctx->droneType = 0;
+        ctx->choice1 = 1;
+      }
+    } else if (ctx->keyPress == 'C') {
+      if (ctx->choice1 == 0) {
+        ctx->droneType = 1;
+        ctx->choice1 = 1;
+      }
+    } else if (ctx->keyPress == 'E') {
+      if (ctx->choice2 == 0) {
+        ctx->integrationMethod = 0;
+        ctx->choice2 = 1;
+      }
+    } else if (ctx->keyPress == 'K') {
+      if (ctx->choice2 == 0) {
+        ctx->integrationMethod = 1;
+        ctx->choice2 = 1;
+      }
+    }
+  }
+  // pause the game
+  if (ctx->pause) {
+    // do nothing
+  } else {
+
+    // reset
+    if (ctx->reset == true) {
+      if (ctx->droneType == 1) {
+        ctx->thrust = 5 * 9.81;
+        ctx->cargoDrone.setStates({0, 0, 0, 0, 0, 0, 0 - 1, 0, 0});
+      } else if (ctx->droneType == 0) {
+        ctx->thrust = 3 * 9.81;
+        ctx->drone.setStates({0, 0, 0, 0, 0, 0, 0, 0, 0});
+      }
+      ctx->angVel = 0;
+      ctx->xVel = 0;
+      ctx->yVel = 0;
+      ctx->reset = false;
+      // set velocity inputs to Drone vel
+    }
+
+    // integration
+    for (int i = 0; i < 2; ++i) {
+      if (ctx->controllerActive == true) {
+        ctx->controller.setDroneType(ctx->droneType);
+        ctx->controller.setReceivedVelref({ctx->xVel, ctx->yVel});
+        ctx->controller.calculateControllerOutput();
+        if (ctx->droneType == 1) {
+          ctx->controller.setReceivedUpdatedStates(ctx->cargoDrone.getStates());
+          ctx->cargoDroneDynamics.setReceivedInputs(ctx->controller.getInput());
+        } else if (ctx->droneType == 0) {
+          ctx->controller.setReceivedUpdatedStates(ctx->drone.getStates());
+          ctx->droneDynamics.setReceivedInputs(ctx->controller.getInput());
+        }
+      } else {
+        if (ctx->droneType == 1) {
+          ctx->cargoDroneDynamics.setReceivedInputs({ctx->thrust, ctx->angVel});
+        } else if (ctx->droneType == 0) {
+          ctx->droneDynamics.setReceivedInputs({ctx->thrust, ctx->angVel});
+        }
+      }
+      if (ctx->droneType == 1) {
+        ctx->cargoDroneDynamics.setReceivedStates(ctx->cargoDrone.getStates());
+        if (ctx->integrationMethod == 1) {
+          ctx->cargoDroneDynamics.rungeKutta();
+        } else if (ctx->integrationMethod == 0) {
+          ctx->cargoDroneDynamics.forwardEuler();
+        }
+        ctx->cargoDrone.setStates(ctx->cargoDroneDynamics.getUpdatedStates());
+      } else if (ctx->droneType == 0) {
+        ctx->droneDynamics.setReceivedStates(ctx->drone.getStates());
+        if (ctx->integrationMethod == 1) {
+          ctx->droneDynamics.rungeKutta();
+        } else if (ctx->integrationMethod == 0) {
+          ctx->droneDynamics.forwardEuler();
+        }
+        ctx->drone.setStates(ctx->droneDynamics.getUpdatedStates());
+      }
+    }
+
+    // scaling coordinates to drone/cargo size
+    if (ctx->droneType == 1) {
+      ctx->x = ctx->lineLength * 2 * ctx->cargoDrone.getStates().at(0);
+      ctx->y = -ctx->lineLength * 2 * ctx->cargoDrone.getStates().at(1);
+      ctx->angle = ctx->cargoDrone.getStates().at(2);
+      ctx->x_c = ctx->lineLength * 2 * ctx->cargoDrone.getStates().at(5);
+      ctx->y_c = -ctx->lineLength * 2 * ctx->cargoDrone.getStates().at(6);
+    } else if (ctx->droneType == 0) {
+      ctx->x = ctx->lineLength * 2 * ctx->drone.getStates().at(0);
+      ctx->y = -ctx->lineLength * 2 * ctx->drone.getStates().at(1);
+      ctx->angle = ctx->drone.getStates().at(2);
+      ctx->x_c = ctx->lineLength * 2 * ctx->drone.getStates().at(5);
+      ctx->y_c = -ctx->lineLength * 2 * ctx->drone.getStates().at(6);
+    }
+  }
+  // rendering screen
+  ctx->ui.clear(); // clears screen
+
+  // function to render all the bmp and the animation
+  renderImages(ctx->ui.getRenderer(), ctx->x, ctx->y, ctx->angle, ctx->x_c,
+               ctx->y_c, ctx->droneType, ctx->choice1, ctx->choice2);
+
+  // draw Rope if cargo drone was chosen
+  if (ctx->droneType == 1 && ctx->choice1 == 1 && ctx->choice2 == 1) {
+    ctx->ui.drawLine(ctx->x, ctx->y, ctx->x_c, ctx->y_c);
+  }
+
+  ctx->ui.present(); // shows rendered objects
+
+  // frame time to limit FPS
+  ctx->frameTime = SDL_GetTicks() - ctx->frameStart;
+  if (ctx->frameDelay > ctx->frameTime) {
+    SDL_Delay(ctx->frameDelay - ctx->frameTime);
+  }
+  ctx->controllerCheck++;        // increases frame number
+  if (ctx->controllerCheck > 15) // resets frameNumber if at end of animation
+  {
+    ctx->controllerCheck = 0;
+  }
+}
+
+int main() {
+  context ctx;
+  ctx.controllerCheck = 0;
+
+#ifdef __EMSCRIPTEN__
+  emscripten_set_main_loop_arg(mainloop, &ctx, -1, 1);
+#else
+  chdir(SDL_GetBasePath());
+  while (!ctx.quit) {
+    mainloop(&ctx);
+  }
+#endif
+
   return 0;
 }
